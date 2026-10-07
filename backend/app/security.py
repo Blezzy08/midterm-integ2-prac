@@ -6,11 +6,15 @@ from werkzeug.security import check_password_hash, generate_password_hash
 ROLE_LEVELS = {"user": 1, "admin": 2}
 
 
+class InputValidationError(Exception):
+    pass
+
+
 def _validate_password(password: object) -> str:
     if not isinstance(password, str):
-        raise TypeError("password must be a string")
+        raise InputValidationError("password must be a string")
     if not password:
-        raise ValueError("password must not be empty")
+        raise InputValidationError("password must not be empty")
     return password
 
 
@@ -21,9 +25,9 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     password = _validate_password(password)
     if not isinstance(password_hash, str):
-        raise TypeError("password_hash must be a string")
+        raise InputValidationError("password_hash must be a string")
     if not password_hash:
-        raise ValueError("password_hash must not be empty")
+        raise InputValidationError("password_hash must not be empty")
     return check_password_hash(password_hash, password)
 
 

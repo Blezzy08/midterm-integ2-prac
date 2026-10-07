@@ -1,9 +1,9 @@
 import unittest
 
-from flask import g
+from flask import abort, g
 
 from app import create_app
-from app.security import hash_password, require_role, verify_password
+from app.security import InputValidationError, hash_password, require_role, verify_password
 
 
 class HealthEndpointTestCase(unittest.TestCase):
@@ -31,16 +31,62 @@ class PasswordSecurityTestCase(unittest.TestCase):
     def test_password_helpers_reject_invalid_inputs(self):
         password_hash = hash_password("valid password")
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InputValidationError):
             hash_password("")
-        with self.assertRaises(TypeError):
+        with self.assertRaises(InputValidationError):
             hash_password(None)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InputValidationError):
             verify_password("", password_hash)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InputValidationError):
             verify_password("valid password", "")
-        with self.assertRaises(TypeError):
+        with self.assertRaises(InputValidationError):
             verify_password("valid password", None)
+
+
+class ErrorHandlingTestCase(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app()
+
+        @self.app.get("/test-validation-error")
+        def validation_error():
+            hash_password("")
+
+        @self.app.get("/test-bad-request")
+        def bad_request():
+            abort(400)
+
+        @self.app.get("/test-server-error")
+        def server_error():
+            raise RuntimeError("internal details")
+
+        self.client = self.app.test_client()
+
+    def test_unknown_path_returns_json_404(self):
+        response = self.client.get("/missing")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.get_json(), {"error": "Not found"})
+
+    def test_validation_failure_returns_json_400(self):
+        response = self.client.get("/test-validation-error")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json(),
+            {"error": "Validation error", "message": "password must not be empty"},
+        )
+
+    def test_bad_request_returns_json_400(self):
+        response = self.client.get("/test-bad-request")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "Bad request"})
+
+    def test_server_error_hides_internal_details(self):
+        response = self.client.get("/test-server-error")
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.get_json(), {"error": "Internal server error"})
 
 
 class RoleBasedAccessControlTestCase(unittest.TestCase):
