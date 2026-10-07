@@ -28,6 +28,20 @@ class PasswordSecurityTestCase(unittest.TestCase):
         self.assertFalse(verify_password("wrong password", password_hash))
         self.assertNotEqual(hash_password(password), password_hash)
 
+    def test_password_helpers_reject_invalid_inputs(self):
+        password_hash = hash_password("valid password")
+
+        with self.assertRaises(ValueError):
+            hash_password("")
+        with self.assertRaises(TypeError):
+            hash_password(None)
+        with self.assertRaises(ValueError):
+            verify_password("", password_hash)
+        with self.assertRaises(ValueError):
+            verify_password("valid password", "")
+        with self.assertRaises(TypeError):
+            verify_password("valid password", None)
+
 
 class RoleBasedAccessControlTestCase(unittest.TestCase):
     def setUp(self):
